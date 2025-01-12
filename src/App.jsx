@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { processExcel } from './sepaConverter';
+import { processExcel, previewExcel } from './sepaConverter';
+import ExcelPreview from './components/ExcelPreview';
 
 function App() {
   const [file, setFile] = useState(null);
@@ -7,38 +8,82 @@ function App() {
   const [success, setSuccess] = useState(null);
   const [xmlData, setXmlData] = useState(null);
   const [decimalSeparator, setDecimalSeparator] = useState('.');
+  const [previewData, setPreviewData] = useState(null);
+  const [selectedSheet, setSelectedSheet] = useState('');
+  const [availableSheets, setAvailableSheets] = useState([]);
 
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
     const selectedFile = event.target.files[0];
     if (selectedFile && selectedFile.name.endsWith('.xlsx')) {
       setFile(selectedFile);
       setError(null);
+      try {
+        const { sheets, preview, firstSheet } = await previewExcel(selectedFile);
+        setAvailableSheets(sheets);
+        setSelectedSheet(firstSheet);
+        setPreviewData(preview);
+        // Automatically set decimal separator based on detected format
+        if (preview.detectedSeparator) {
+          setDecimalSeparator(preview.detectedSeparator);
+        }
+      } catch (err) {
+        setError('Error reading Excel file: ' + err.message);
+      }
     } else {
       setError('Please select a valid Excel (.xlsx) file');
       setFile(null);
+      setPreviewData(null);
     }
   };
 
-  const handleDrop = (event) => {
+  const handleDrop = async (event) => {
     event.preventDefault();
     const droppedFile = event.dataTransfer.files[0];
     if (droppedFile && droppedFile.name.endsWith('.xlsx')) {
       setFile(droppedFile);
       setError(null);
+      try {
+        const { sheets, preview, firstSheet } = await previewExcel(droppedFile);
+        setAvailableSheets(sheets);
+        setSelectedSheet(firstSheet);
+        setPreviewData(preview);
+        // Automatically set decimal separator based on detected format
+        if (preview.detectedSeparator) {
+          setDecimalSeparator(preview.detectedSeparator);
+        }
+      } catch (err) {
+        setError('Error reading Excel file: ' + err.message);
+      }
     } else {
       setError('Please drop a valid Excel (.xlsx) file');
+      setPreviewData(null);
     }
   };
 
-  const handleDragOver = (event) => {
-    event.preventDefault();
+  const handleSheetChange = async (event) => {
+    const newSheet = event.target.value;
+    setSelectedSheet(newSheet);
+    try {
+      const { preview } = await previewExcel(file, newSheet);
+      setPreviewData(preview);
+      // Update decimal separator if it changes in the new sheet
+      if (preview.detectedSeparator) {
+        setDecimalSeparator(preview.detectedSeparator);
+      }
+    } catch (err) {
+      setError('Error reading sheet: ' + err.message);
+    }
+  };
+
+  const handleDecimalSeparatorChange = (event) => {
+    setDecimalSeparator(event.target.value);
   };
 
   const handleConvert = async () => {
     try {
       setError(null);
       setSuccess(null);
-      const result = await processExcel(file, decimalSeparator);
+      const result = await processExcel(file, decimalSeparator, selectedSheet);
       setXmlData(result.xml);
       setSuccess(`Successfully converted ${result.transactionCount} transactions with total amount: ${result.totalAmount} EUR`);
     } catch (err) {
@@ -66,7 +111,9 @@ function App() {
     setSuccess(null);
     setXmlData(null);
     setDecimalSeparator('.');
-    // Reset the file input
+    setPreviewData(null);
+    setSelectedSheet('');
+    setAvailableSheets([]);
     const fileInput = document.getElementById('file-input');
     if (fileInput) {
       fileInput.value = '';
@@ -77,24 +124,10 @@ function App() {
     <div className="container">
       <h1>SEPA Direct Debit Converter</h1>
       
-      <div className="settings">
-        <label>
-          Decimal Separator in Excel:
-          <select 
-            value={decimalSeparator} 
-            onChange={(e) => setDecimalSeparator(e.target.value)}
-            className="select"
-          >
-            <option value=".">Point (.)</option>
-            <option value=",">Comma (,)</option>
-          </select>
-        </label>
-      </div>
-
       <div 
         className="dropzone"
         onDrop={handleDrop}
-        onDragOver={handleDragOver}
+        onDragOver={(e) => e.preventDefault()}
       >
         <input
           type="file"
@@ -110,6 +143,44 @@ function App() {
 
       {error && <div className="error">{error}</div>}
       {success && <div className="success">{success}</div>}
+
+      {previewData && (
+        <div className="settings-panel">
+          <div className="settings-row">
+            <label>
+              Select Sheet:
+              <select 
+                value={selectedSheet} 
+                onChange={handleSheetChange}
+                className="select"
+              >
+                {availableSheets.map(sheet => (
+                  <option key={sheet} value={sheet}>{sheet}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Amount Decimal Separator:
+              <select 
+                value={decimalSeparator} 
+                onChange={handleDecimalSeparatorChange}
+                className="select"
+              >
+                <option value=".">Point (1234.56)</option>
+                <option value=",">Comma (1234,56)</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="preview-info">
+            <p>Detected decimal separator: <strong>{previewData.detectedSeparator === ',' ? 'Comma' : 'Point'}</strong></p>
+            <p>Please verify that the amounts are displayed correctly with the selected decimal separator.</p>
+          </div>
+
+          <ExcelPreview data={previewData} />
+        </div>
+      )}
 
       <div className="button-group">
         <button 

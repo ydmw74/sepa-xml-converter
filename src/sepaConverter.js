@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Builder } from 'xml2js';
-import { validateIBAN, validateBIC, validateAmount, validateMandateId, validateMandateDate } from '../validators.js';
+import { validateIBAN, validateBIC, validateAmount, validateMandateId, validateMandateDate } from './validators.js';
 
 const CREDITOR_NAME = "Your Company Name";
 const CREDITOR_IBAN = "DE02701500000000594937";
@@ -143,7 +143,84 @@ function generateSepaXML(transactions, decimalSeparator) {
   return builder.buildObject(xmlObj);
 }
 
-export async function processExcel(file, decimalSeparator) {
+function detectDecimalSeparator(worksheet) {
+  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  // Skip header row
+  const rows = data.slice(1);
+  
+  for (const row of rows) {
+    const amountCell = row[data[0].findIndex(header => header === 'Amount')];
+    if (amountCell) {
+      const amountStr = amountCell.toString();
+      if (amountStr.includes(',')) return ',';
+      if (amountStr.includes('.')) return '.';
+    }
+  }
+  return '.'; // default to point if no decimal separator is found
+}
+
+export async function previewExcel(file, selectedSheet = null) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array', raw: true });
+        
+        // Get all sheet names
+        const sheets = workbook.SheetNames;
+        
+        if (sheets.length === 0) {
+          throw new Error('No sheets found in Excel file');
+        }
+
+        // Use selected sheet or first sheet
+        const sheetName = selectedSheet || sheets[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Detect decimal separator from the actual Excel data
+        const detectedSeparator = detectDecimalSeparator(worksheet);
+        
+        // Read the data preserving the original format
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          raw: false,
+          defval: ''
+        });
+        
+        if (jsonData.length === 0) {
+          throw new Error('No data found in selected sheet');
+        }
+
+        // Get headers from first row
+        const headers = Object.keys(jsonData[0]);
+        
+        // Limit preview to first 5 rows
+        const previewRows = jsonData.slice(0, 5);
+
+        resolve({
+          sheets,
+          firstSheet: sheets[0],
+          preview: {
+            headers,
+            rows: previewRows,
+            detectedSeparator
+          }
+        });
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => {
+      reject(new Error('Error reading file'));
+    };
+
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+export async function processExcel(file, decimalSeparator, selectedSheet) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -151,7 +228,7 @@ export async function processExcel(file, decimalSeparator) {
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const worksheet = workbook.Sheets[selectedSheet];
         const transactions = XLSX.utils.sheet_to_json(worksheet);
 
         if (transactions.length === 0) {
