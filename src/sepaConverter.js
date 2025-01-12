@@ -7,16 +7,24 @@ const CREDITOR_IBAN = "DE02701500000000594937";
 const CREDITOR_BIC = "SSKMDEMM";
 const CREDITOR_ID = "DE98ZZZ09999999999";
 
-function parseAmount(amount) {
+function parseAmount(amount, decimalSeparator) {
   if (typeof amount === 'number') {
     return amount;
   }
-  // Handle string amounts, remove any currency symbols and convert commas to dots
-  const cleanAmount = amount.toString().replace(/[^0-9.,]/g, '').replace(',', '.');
+  
+  // Handle string amounts
+  const cleanAmount = amount.toString()
+    // Remove any currency symbols and whitespace
+    .replace(/[^0-9.,]/g, '')
+    // Replace the selected decimal separator with a dot
+    .replace(decimalSeparator === ',' ? /,([^,]*)$/ : /\.([^.]*)$/, '.$1')
+    // Remove any remaining separators
+    .replace(/[,]/g, '');
+
   return parseFloat(cleanAmount);
 }
 
-function validateTransaction(transaction, index) {
+function validateTransaction(transaction, index, decimalSeparator) {
   const errors = [];
 
   if (!validateIBAN(transaction.IBAN)) {
@@ -29,7 +37,7 @@ function validateTransaction(transaction, index) {
     errors.push(`Row ${index + 1}: Invalid Name (max 70 characters)`);
   }
   
-  const amount = parseAmount(transaction.Amount);
+  const amount = parseAmount(transaction.Amount, decimalSeparator);
   if (isNaN(amount) || !validateAmount(amount)) {
     errors.push(`Row ${index + 1}: Invalid Amount`);
   }
@@ -47,7 +55,7 @@ function validateTransaction(transaction, index) {
   return errors;
 }
 
-function generateSepaXML(transactions) {
+function generateSepaXML(transactions, decimalSeparator) {
   const now = new Date();
   const msgId = `MSG${now.getTime()}`;
   const pmtInfId = `PMT${now.getTime()}`;
@@ -55,7 +63,7 @@ function generateSepaXML(transactions) {
   // Parse amounts and calculate total
   const parsedTransactions = transactions.map(t => ({
     ...t,
-    Amount: parseAmount(t.Amount)
+    Amount: parseAmount(t.Amount, decimalSeparator)
   }));
   
   const totalAmount = parsedTransactions.reduce((sum, t) => sum + t.Amount, 0);
@@ -135,7 +143,7 @@ function generateSepaXML(transactions) {
   return builder.buildObject(xmlObj);
 }
 
-export async function processExcel(file) {
+export async function processExcel(file, decimalSeparator) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -153,7 +161,7 @@ export async function processExcel(file) {
         // Validate all transactions
         const allErrors = [];
         transactions.forEach((transaction, index) => {
-          const errors = validateTransaction(transaction, index);
+          const errors = validateTransaction(transaction, index, decimalSeparator);
           allErrors.push(...errors);
         });
 
@@ -161,8 +169,10 @@ export async function processExcel(file) {
           throw new Error('Validation errors found:\n' + allErrors.join('\n'));
         }
 
-        const xml = generateSepaXML(transactions);
-        const totalAmount = transactions.reduce((sum, t) => sum + parseAmount(t.Amount), 0).toFixed(2);
+        const xml = generateSepaXML(transactions, decimalSeparator);
+        const totalAmount = transactions.reduce((sum, t) => 
+          sum + parseAmount(t.Amount, decimalSeparator), 0
+        ).toFixed(2);
 
         resolve({
           xml,

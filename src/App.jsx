@@ -6,6 +6,7 @@ function App() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [xmlData, setXmlData] = useState(null);
+  const [decimalSeparator, setDecimalSeparator] = useState('.');
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
@@ -37,7 +38,7 @@ function App() {
     try {
       setError(null);
       setSuccess(null);
-      const result = await processExcel(file);
+      const result = await processExcel(file, decimalSeparator);
       setXmlData(result.xml);
       setSuccess(`Successfully converted ${result.transactionCount} transactions with total amount: ${result.totalAmount} EUR`);
     } catch (err) {
@@ -59,10 +60,37 @@ function App() {
     document.body.removeChild(a);
   };
 
+  const handleReset = () => {
+    setFile(null);
+    setError(null);
+    setSuccess(null);
+    setXmlData(null);
+    setDecimalSeparator('.');
+    // Reset the file input
+    const fileInput = document.getElementById('file-input');
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
+
   return (
     <div className="container">
       <h1>SEPA Direct Debit Converter</h1>
       
+      <div className="settings">
+        <label>
+          Decimal Separator in Excel:
+          <select 
+            value={decimalSeparator} 
+            onChange={(e) => setDecimalSeparator(e.target.value)}
+            className="select"
+          >
+            <option value=".">Point (.)</option>
+            <option value=",">Comma (,)</option>
+          </select>
+        </label>
+      </div>
+
       <div 
         className="dropzone"
         onDrop={handleDrop}
@@ -83,22 +111,31 @@ function App() {
       {error && <div className="error">{error}</div>}
       {success && <div className="success">{success}</div>}
 
-      <button 
-        className="button"
-        onClick={handleConvert}
-        disabled={!file}
-      >
-        Convert to SEPA XML
-      </button>
-
-      {xmlData && (
+      <div className="button-group">
         <button 
           className="button"
-          onClick={handleDownload}
+          onClick={handleConvert}
+          disabled={!file}
         >
-          Download XML
+          Convert to SEPA XML
         </button>
-      )}
+
+        {xmlData && (
+          <button 
+            className="button"
+            onClick={handleDownload}
+          >
+            Download XML
+          </button>
+        )}
+
+        <button 
+          className="button button-reset"
+          onClick={handleReset}
+        >
+          Reset
+        </button>
+      </div>
     </div>
   );
 }
