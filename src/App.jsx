@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { processExcel, previewExcel } from './sepaConverter';
+import sepaConverter from './sepaConverter';
 import ExcelPreview from './components/ExcelPreview';
 
 function App() {
@@ -18,11 +18,10 @@ function App() {
       setFile(selectedFile);
       setError(null);
       try {
-        const { sheets, preview, firstSheet } = await previewExcel(selectedFile);
+        const { sheets, preview, firstSheet } = await sepaConverter.previewExcel(selectedFile);
         setAvailableSheets(sheets);
         setSelectedSheet(firstSheet);
         setPreviewData(preview);
-        // Automatically set decimal separator based on detected format
         if (preview.detectedSeparator) {
           setDecimalSeparator(preview.detectedSeparator);
         }
@@ -43,11 +42,10 @@ function App() {
       setFile(droppedFile);
       setError(null);
       try {
-        const { sheets, preview, firstSheet } = await previewExcel(droppedFile);
+        const { sheets, preview, firstSheet } = await sepaConverter.previewExcel(droppedFile);
         setAvailableSheets(sheets);
         setSelectedSheet(firstSheet);
         setPreviewData(preview);
-        // Automatically set decimal separator based on detected format
         if (preview.detectedSeparator) {
           setDecimalSeparator(preview.detectedSeparator);
         }
@@ -64,9 +62,8 @@ function App() {
     const newSheet = event.target.value;
     setSelectedSheet(newSheet);
     try {
-      const { preview } = await previewExcel(file, newSheet);
+      const { preview } = await sepaConverter.previewExcel(file, newSheet);
       setPreviewData(preview);
-      // Update decimal separator if it changes in the new sheet
       if (preview.detectedSeparator) {
         setDecimalSeparator(preview.detectedSeparator);
       }
@@ -83,7 +80,7 @@ function App() {
     try {
       setError(null);
       setSuccess(null);
-      const result = await processExcel(file, decimalSeparator, selectedSheet);
+      const result = await sepaConverter.processExcel(file, decimalSeparator, selectedSheet);
       setXmlData(result.xml);
       setSuccess(`Successfully converted ${result.transactionCount} transactions with total amount: ${result.totalAmount} EUR`);
     } catch (err) {
@@ -120,9 +117,23 @@ function App() {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    sepaConverter.generateTemplate();
+  };
+
   return (
     <div className="container">
       <h1>SEPA Direct Debit Converter</h1>
+      
+      <div className="template-section">
+        <p>New to SEPA Direct Debit? Start with our template:</p>
+        <button 
+          className="button button-secondary"
+          onClick={handleDownloadTemplate}
+        >
+          Download Excel Template
+        </button>
+      </div>
       
       <div 
         className="dropzone"
