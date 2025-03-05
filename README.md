@@ -23,14 +23,15 @@ The SEPA XML Converter is a web-based tool designed to convert Excel files into 
    cd sepa-xml-converter
    ```
 
-2. Install the dependencies:
+2. Install the dependencies & build the app:
    ```bash
    npm install
+   npm run build
    ```
 
 ### Usage
 1. **Access the Web Interface**:
-   - Open your web browser and navigate to `http://localhost:3000`.
+   - Open your web browser and navigate to `http(s)://<your-domain.tld>.
    - The web interface will load, allowing you to upload your Excel file and perform the conversion.
 
 2. **Convert Excel to SEPA XML**:
