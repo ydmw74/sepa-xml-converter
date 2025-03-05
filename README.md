@@ -1,7 +1,7 @@
 # SEPA XML Converter
 
 ## Overview
-The SEPA XML Converter is a tool designed to convert Excel files into SEPA XML format. This application is particularly useful for financial institutions and businesses that need to process SEPA payments efficiently.
+The SEPA XML Converter is a web-based tool designed to convert Excel files into SEPA XML format. This application is particularly useful for financial institutions and businesses that need to process SEPA payments efficiently. The app features a user-friendly web interface for easy interaction. The tool reads an Excel file containing payment details, validates the data, and generates a SEPA XML file for payment processing.
 
 ## Features
 - **Excel to SEPA XML Conversion**: Convert Excel files containing payment details into SEPA XML format.
@@ -14,6 +14,7 @@ The SEPA XML Converter is a tool designed to convert Excel files into SEPA XML f
 ### Prerequisites
 - Node.js (version 14 or later)
 - npm (version 6 or later)
+- A modern web browser (e.g., Chrome, Firefox, Safari)
 
 ### Installation
 1. Clone the repository:
@@ -28,27 +29,21 @@ The SEPA XML Converter is a tool designed to convert Excel files into SEPA XML f
    ```
 
 ### Usage
-1. **Convert Excel to SEPA XML**:
-   - Place your Excel file in the root directory of the project.
-   - Run the conversion script:
-     ```bash
-     node create-excel.js
-     ```
-   - The generated SEPA XML file will be saved in the root directory.
+1. **Access the Web Interface**:
+   - Open your web browser and navigate to `http://localhost:3000`.
+   - The web interface will load, allowing you to upload your Excel file and perform the conversion.
 
-2. **Validate Excel File**:
-   - Run the validation script:
-     ```bash
-     node validators.js
-     ```
-   - The script will output the validation results.
+2. **Convert Excel to SEPA XML**:
+   - Use the web interface to upload your Excel file.
+   - Follow the on-screen instructions to complete the conversion process.
 
-3. **Preview Excel File**:
-   - Run the preview script:
-     ```bash
-     node src/components/ExcelPreview.jsx
-     ```
-   - The script will display the content of the Excel file in the terminal.
+3. **Validate Excel File**:
+   - Use the web interface to validate the Excel file.
+   - The web interface will display the validation results.
+
+4. **Preview Excel File**:
+   - Use the web interface to preview the Excel file content.
+   - The web interface will display the content of the Excel file.
 
 ## File Structure
 ```
