@@ -19,7 +19,7 @@ The SEPA XML Converter is a web-based tool designed to convert Excel files into 
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/sepa-xml-converter.git
+   git clone https://github.com/ydmw74/sepa-xml-converter.git
    cd sepa-xml-converter
    ```
 
