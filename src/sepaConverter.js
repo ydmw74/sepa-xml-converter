@@ -3,8 +3,8 @@ import { Builder } from 'xml2js';
 import { validateIBAN, validateBIC, validateAmount, validateMandateId, validateMandateDate } from './validators.js';
 
 const CREDITOR_NAME = "Your Company Name";
-const CREDITOR_IBAN = "DE02701500000000594937";
-const CREDITOR_BIC = "SSKMDEMM";
+let CREDITOR_IBAN = "DE02701500000000594937";
+let CREDITOR_BIC = "SSKMDEMM";
 const CREDITOR_ID = "DE98ZZZ09999999999";
 
 function formatDate(dateString) {
@@ -39,7 +39,7 @@ function parseAmount(amount, decimalSeparator) {
   if (typeof amount === 'number') {
     return amount;
   }
-  
+
   const cleanAmount = amount.toString()
     .replace(/[^0-9.,]/g, '')
     .replace(decimalSeparator === ',' ? /,([^,]*)$/ : /\.([^.]*)$/, '.$1')
@@ -60,12 +60,12 @@ function validateTransaction(transaction, index, decimalSeparator) {
   if (!transaction.Name || transaction.Name.length > 70) {
     errors.push(`Row ${index + 1}: Invalid Name (max 70 characters)`);
   }
-  
+
   const amount = parseAmount(transaction.Amount, decimalSeparator);
   if (isNaN(amount) || !validateAmount(amount)) {
     errors.push(`Row ${index + 1}: Invalid Amount`);
   }
-  
+
   if (!validateMandateId(transaction['Mandate ID'])) {
     errors.push(`Row ${index + 1}: Invalid Mandate ID`);
   }
@@ -86,18 +86,30 @@ function validateTransaction(transaction, index, decimalSeparator) {
   return errors;
 }
 
-function generateSepaXML(transactions, decimalSeparator) {
+function generateSepaXML(transactions, decimalSeparator, creditorIBAN, creditorBIC, initgPty, cdtrSchmeId, seqTp) {
   const now = new Date();
   const msgId = `MSG${now.getTime()}`;
   const pmtInfId = `PMT${now.getTime()}`;
-  
+
   const parsedTransactions = transactions.map(t => ({
     ...t,
     Amount: parseAmount(t.Amount, decimalSeparator),
     'Mandate Date': formatDate(t['Mandate Date'])
   }));
-  
+
   const totalAmount = parsedTransactions.reduce((sum, t) => sum + t.Amount, 0);
+
+  // Log values for debugging
+  console.log('creditorIBAN:', creditorIBAN);
+  console.log('creditorBIC:', creditorBIC);
+  console.log('initgPty:', initgPty);
+  console.log('cdtrSchmeId:', cdtrSchmeId);
+  console.log('seqTp:', seqTp);
+
+  // Validate required fields
+  if (!creditorIBAN || !creditorBIC || !initgPty || !cdtrSchmeId || !seqTp) {
+    throw new Error('Missing required fields for XML generation');
+  }
 
   const xmlObj = {
     Document: {
@@ -113,7 +125,7 @@ function generateSepaXML(transactions, decimalSeparator) {
           NbOfTxs: transactions.length,
           CtrlSum: totalAmount.toFixed(2),
           InitgPty: {
-            Nm: CREDITOR_NAME
+            Nm: initgPty
           }
         },
         PmtInf: {
@@ -124,24 +136,24 @@ function generateSepaXML(transactions, decimalSeparator) {
           PmtTpInf: {
             SvcLvl: { Cd: 'SEPA' },
             LclInstrm: { Cd: 'CORE' },
-            SeqTp: 'FRST'
+            SeqTp: seqTp
           },
           ReqdColltnDt: new Date(now.getTime() + 86400000).toISOString().split('T')[0],
           Cdtr: {
-            Nm: CREDITOR_NAME
+            Nm: initgPty
           },
           CdtrAcct: {
-            Id: { IBAN: CREDITOR_IBAN }
+            Id: { IBAN: creditorIBAN }
           },
           CdtrAgt: {
-            FinInstnId: { BIC: CREDITOR_BIC }
+            FinInstnId: { BIC: creditorBIC }
           },
           ChrgBr: 'SLEV',
           CdtrSchmeId: {
             Id: {
               PrvtId: {
                 Othr: {
-                  Id: CREDITOR_ID,
+                  Id: cdtrSchmeId,
                   SchmeNm: { Prtry: 'SEPA' }
                 }
               }
@@ -177,7 +189,7 @@ function generateSepaXML(transactions, decimalSeparator) {
 function detectDecimalSeparator(worksheet) {
   const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
   const rows = data.slice(1);
-  
+
   for (const row of rows) {
     const amountCell = row[data[0].findIndex(header => header === 'Amount')];
     if (amountCell) {
@@ -193,28 +205,28 @@ const sepaConverter = {
   async previewExcel(file, selectedSheet = null) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array', raw: true });
-          
+
           const sheets = workbook.SheetNames;
-          
+
           if (sheets.length === 0) {
             throw new Error('No sheets found in Excel file');
           }
 
           const sheetName = selectedSheet || sheets[0];
           const worksheet = workbook.Sheets[sheetName];
-          
+
           const detectedSeparator = detectDecimalSeparator(worksheet);
-          
+
           const jsonData = XLSX.utils.sheet_to_json(worksheet, {
             raw: false,
             defval: ''
           });
-          
+
           if (jsonData.length === 0) {
             throw new Error('No data found in selected sheet');
           }
@@ -247,7 +259,7 @@ const sepaConverter = {
   async processExcel(file, decimalSeparator, selectedSheet) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const data = new Uint8Array(e.target.result);
@@ -269,8 +281,14 @@ const sepaConverter = {
             throw new Error('Validation errors found:\n' + allErrors.join('\n'));
           }
 
-          const xml = generateSepaXML(transactions, decimalSeparator);
-          const totalAmount = transactions.reduce((sum, t) => 
+const creditorIBAN = transactions[0]['Creditor IBAN'];
+const creditorBIC = transactions[0]['Creditor BIC'];
+const initgPty = transactions[0]['Creditor Name'];
+const cdtrSchmeId = transactions[0]['Creditor ID'];
+const seqTp = transactions[0]['Sequence Type'];
+
+          const xml = generateSepaXML(transactions, decimalSeparator, creditorIBAN, creditorBIC, initgPty, cdtrSchmeId, seqTp);
+          const totalAmount = transactions.reduce((sum, t) =>
             sum + parseAmount(t.Amount, decimalSeparator), 0
           ).toFixed(2);
 
@@ -293,46 +311,61 @@ const sepaConverter = {
   },
 
   generateTemplate() {
-    const templateData = [
-      {
-        'IBAN': 'DE89370400440532013000',
-        'BIC': 'DEUTDEBBXXX',
-        'Name': 'John Doe GmbH',
-        'Amount': '1234.56',
-        'Mandate ID': 'MANDATE-2023-001',
-        'Mandate Date': '2023-01-01',
-        'Description': 'Invoice 2023-001'
-      }
-    ];
+const templateData = [
+  {
+    'IBAN': 'DE89370400440532013000',
+    'BIC': 'DEUTDEBBXXX',
+    'Name': 'John Doe GmbH',
+    'Amount': '1234.56',
+    'Mandate ID': 'MANDATE-2023-001',
+    'Mandate Date': '2023-01-01',
+    'Description': 'Invoice 2023-001',
+    'Creditor IBAN': 'DE02701500000000594937',
+    'Creditor BIC': 'SSKMDEMM',
+    'Creditor Name': 'Your Company Name',
+    'Creditor ID': 'DE98ZZZ09999999999',
+    'Sequence Type': 'RCUR'
+  }
+];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet([]);
 
-    const headerComments = {
-      'IBAN': 'Debtor\'s IBAN (e.g., DE89370400440532013000)',
-      'BIC': 'Debtor\'s BIC (e.g., DEUTDEBBXXX)',
-      'Name': 'Debtor\'s name (max 70 characters)',
-      'Amount': 'Amount in EUR (e.g., 1234.56 or 1234,56)',
-      'Mandate ID': 'Unique mandate reference (max 35 characters)',
-      'Mandate Date': 'Date when mandate was signed (YYYY-MM-DD, DD.MM.YYYY, or DD/MM/YYYY)',
-      'Description': 'Payment reference (max 140 characters)'
-    };
+const headerComments = {
+  'IBAN': 'Debtor\'s IBAN (e.g., DE89370400440532013000)',
+  'BIC': 'Debtor\'s BIC (e.g., DEUTDEBBXXX)',
+  'Name': 'Debtor\'s name (max 70 characters)',
+  'Amount': 'Amount in EUR (e.g., 1234.56 or 1234,56)',
+  'Mandate ID': 'Unique mandate reference (max 35 characters)',
+  'Mandate Date': 'Date when mandate was signed (YYYY-MM-DD, DD.MM.YYYY, or DD/MM/YYYY)',
+  'Description': 'Payment reference (max 140 characters)',
+  'Creditor IBAN': 'Creditor\'s IBAN (e.g., DE02701500000000594937)',
+  'Creditor BIC': 'Creditor\'s BIC (e.g., SSKMDEMM)',
+  'Creditor Name': 'Creditor Name (e.g., Your Company Name)',
+  'Creditor ID': 'Creditor ID (e.g., DE98ZZZ09999999999)',
+  'Sequence Type': 'Sequence Type (e.g., RCUR)'
+};
 
-    const colWidths = {
-      'IBAN': 25,
-      'BIC': 15,
-      'Name': 30,
-      'Amount': 15,
-      'Mandate ID': 20,
-      'Mandate Date': 15,
-      'Description': 40
-    };
+const colWidths = {
+  'IBAN': 25,
+  'BIC': 15,
+  'Name': 30,
+  'Amount': 15,
+  'Mandate ID': 20,
+  'Mandate Date': 15,
+  'Description': 40,
+  'Creditor IBAN': 25,
+  'Creditor BIC': 15,
+  'Creditor Name': 30,
+  'Creditor ID': 25,
+  'Sequence Type': 15
+};
 
     XLSX.utils.sheet_add_json(ws, templateData);
 
     const range = XLSX.utils.decode_range(ws['!ref']);
     const cols = [];
-    
+
     Object.keys(headerComments).forEach((header, idx) => {
       const headerCell = XLSX.utils.encode_cell({ r: 0, c: idx });
       if (!ws[headerCell].c) ws[headerCell].c = [];

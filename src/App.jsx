@@ -11,6 +11,11 @@ function App() {
   const [previewData, setPreviewData] = useState(null);
   const [selectedSheet, setSelectedSheet] = useState('');
   const [availableSheets, setAvailableSheets] = useState([]);
+  const [creditorIBAN, setCreditorIBAN] = useState('');
+  const [creditorBIC, setCreditorBIC] = useState('');
+  const [creditorName, setCreditorName] = useState('');
+  const [creditorID, setCreditorID] = useState('');
+  const [sequenceType, setSequenceType] = useState('');
 
   const handleFileChange = async (event) => {
     const selectedFile = event.target.files[0];
@@ -24,6 +29,13 @@ function App() {
         setPreviewData(preview);
         if (preview.detectedSeparator) {
           setDecimalSeparator(preview.detectedSeparator);
+        }
+        if (preview.rows.length > 0) {
+          setCreditorIBAN(preview.rows[0]['Creditor IBAN']);
+          setCreditorBIC(preview.rows[0]['Creditor BIC']);
+          setCreditorName(preview.rows[0]['Creditor Name']);
+          setCreditorID(preview.rows[0]['Creditor ID']);
+          setSequenceType(preview.rows[0]['Sequence Type']);
         }
       } catch (err) {
         setError('Error reading Excel file: ' + err.message);
@@ -49,6 +61,13 @@ function App() {
         if (preview.detectedSeparator) {
           setDecimalSeparator(preview.detectedSeparator);
         }
+        if (preview.rows.length > 0) {
+          setCreditorIBAN(preview.rows[0]['Creditor IBAN']);
+          setCreditorBIC(preview.rows[0]['Creditor BIC']);
+          setCreditorName(preview.rows[0]['Creditor Name']);
+          setCreditorID(preview.rows[0]['Creditor ID']);
+          setSequenceType(preview.rows[0]['Sequence Type']);
+        }
       } catch (err) {
         setError('Error reading Excel file: ' + err.message);
       }
@@ -66,6 +85,13 @@ function App() {
       setPreviewData(preview);
       if (preview.detectedSeparator) {
         setDecimalSeparator(preview.detectedSeparator);
+      }
+      if (preview.rows.length > 0) {
+        setCreditorIBAN(preview.rows[0]['Creditor IBAN']);
+        setCreditorBIC(preview.rows[0]['Creditor BIC']);
+        setCreditorName(preview.rows[0]['Creditor Name']);
+        setCreditorID(preview.rows[0]['Creditor ID']);
+        setSequenceType(preview.rows[0]['Sequence Type']);
       }
     } catch (err) {
       setError('Error reading sheet: ' + err.message);
@@ -111,6 +137,11 @@ function App() {
     setPreviewData(null);
     setSelectedSheet('');
     setAvailableSheets([]);
+    setCreditorIBAN('');
+    setCreditorBIC('');
+    setCreditorName('');
+    setCreditorID('');
+    setSequenceType('');
     const fileInput = document.getElementById('file-input');
     if (fileInput) {
       fileInput.value = '';
@@ -124,18 +155,18 @@ function App() {
   return (
     <div className="container">
       <h1>SEPA Direct Debit Converter</h1>
-      
+
       <div className="template-section">
         <p>New to SEPA Direct Debit? Start with our template:</p>
-        <button 
+        <button
           className="button button-secondary"
           onClick={handleDownloadTemplate}
         >
           Download Excel Template
         </button>
       </div>
-      
-      <div 
+
+      <div
         className="dropzone"
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
@@ -160,8 +191,8 @@ function App() {
           <div className="settings-row">
             <label>
               Select Sheet:
-              <select 
-                value={selectedSheet} 
+              <select
+                value={selectedSheet}
                 onChange={handleSheetChange}
                 className="select"
               >
@@ -173,8 +204,8 @@ function App() {
 
             <label>
               Amount Decimal Separator:
-              <select 
-                value={decimalSeparator} 
+              <select
+                value={decimalSeparator}
                 onChange={handleDecimalSeparatorChange}
                 className="select"
               >
@@ -194,7 +225,7 @@ function App() {
       )}
 
       <div className="button-group">
-        <button 
+        <button
           className="button"
           onClick={handleConvert}
           disabled={!file}
@@ -203,7 +234,7 @@ function App() {
         </button>
 
         {xmlData && (
-          <button 
+          <button
             className="button"
             onClick={handleDownload}
           >
@@ -211,7 +242,7 @@ function App() {
           </button>
         )}
 
-        <button 
+        <button
           className="button button-reset"
           onClick={handleReset}
         >
